@@ -2,35 +2,28 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Stark Industries - StarkHud v1.0</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Particle Gesture System</title>
     <style>
-        body { margin: 0; overflow: hidden; background: #010409; font-family: 'Courier New', Courier, monospace; color: #00d4ff; }
+        body { margin: 0; overflow: hidden; background: #050D1C; font-family: sans-serif; }
         canvas { display: block; }
-        #hud {
-            position: absolute; top: 20px; left: 20px; 
-            padding: 15px; border-radius: 10px;
-            background: rgba(0, 20, 40, 0.3);
-            border: 1px solid rgba(0, 212, 255, 0.2);
-            backdrop-filter: blur(5px);
-            pointer-events: none;
+        #controls {
+            position: absolute; top: 20px; left: 20px; color: #00d4ff;
+            background: rgba(255,255,255,0.05); padding: 15px; border-radius: 15px;
+            backdrop-filter: blur(10px); border: 1px solid rgba(255,255,255,0.1);
         }
-        #hud h1 { margin: 0 0 5px 0; font-size: 18px; text-transform: uppercase; letter-spacing: 2px; }
-        #hud p { margin: 0; font-size: 12px; opacity: 0.8; }
-        .status { color: #00ff00; font-weight: bold; }
-        .video-feed { position: absolute; bottom: 10px; right: 10px; width: 150px; border-radius: 8px; border: 1px solid #00d4ff; transform: scaleX(-1); opacity: 0.5; }
+        .video-feed { position: absolute; bottom: 20px; right: 20px; width: 200px; border-radius: 10px; border: 2px solid #00d4ff; transform: scaleX(-1); }
     </style>
 </head>
 <body>
 
-    <div id="hud">
-        <h1>Stark Hud v1.0</h1>
-        <p>System: <span class="status">Online</span></p>
-        <p>Power: Arc Reactor Core</p>
-        <p>Gesture: <span id="gestureStatus">Scanning...</span></p>
+    <div id="controls">
+        <h2 style="margin:0 0 10px 0; font-size: 16px;">Gesture Particle System</h2>
+        <p style="font-size: 12px;">Shape: <span id="currentShape">Sphere</span></p>
+        <p style="font-size: 10px; color: #888;">Open Hand: Expand | Fist: Contract | Move: Rotate</p>
     </div>
 
-    <video class="video-feed" autoplay playsinline muted></video>
+    <video class="video-feed" autoplay playsinline></video>
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js"></script>
@@ -46,45 +39,54 @@
 
         camera.position.z = 5;
 
-        // --- IRON MAN PARTICLE SYSTEM (Repulsor/Arc Reactor) ---
-        const particleCount = 10000;
+        // --- PARTICLE SYSTEM ---
+        const particleCount = 5000;
         const geometry = new THREE.BufferGeometry();
         const positions = new Float32Array(particleCount * 3);
         const colors = new Float32Array(particleCount * 3);
-        const sizes = new Float32Array(particleCount);
 
-        const coreColor = new THREE.Color(0x00d4ff); // Jarvis Blue
-        const beamColor = new THREE.Color(0xffffff); // White hot
-
-        for (let i = 0; i < particleCount; i++) {
-            // Initial positions: Arc Reactor Ring
-            const angle = (i / particleCount) * Math.PI * 2;
-            const radius = 1.5 + (Math.random() - 0.5) * 0.2;
-            positions[i * 3] = Math.cos(angle) * radius;
-            positions[i * 3 + 1] = Math.sin(angle) * radius;
-            positions[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
-
-            // Colors
-            coreColor.toArray(colors, i * 3);
-            sizes[i] = Math.random() * 0.05 + 0.01;
+        for (let i = 0; i < particleCount * 3; i++) {
+            positions[i] = (Math.random() - 0.5) * 10;
+            colors[i] = Math.random();
         }
 
         geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
         geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
-        geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
 
-        // Custom Shader for glowing points
         const material = new THREE.PointsMaterial({
-            size: 0.04,
+            size: 0.05,
             vertexColors: true,
             transparent: true,
-            blending: THREE.AdditiveBlending,
-            depthWrite: false,
-            sizeAttenuation: true
+            blending: THREE.AdditiveBlending
         });
 
         const particleSystem = new THREE.Points(geometry, material);
         scene.add(particleSystem);
+
+        // --- SHAPE TEMPLATES ---
+        const shapes = {
+            sphere: () => {
+                const pos = geometry.attributes.position.array;
+                for (let i = 0; i < particleCount; i++) {
+                    const phi = Math.acos(-1 + (2 * i) / particleCount);
+                    const theta = Math.sqrt(particleCount * Math.PI) * phi;
+                    pos[i * 3] = 2 * Math.cos(theta) * Math.sin(phi);
+                    pos[i * 3 + 1] = 2 * Math.sin(theta) * Math.sin(phi);
+                    pos[i * 3 + 2] = 2 * Math.cos(phi);
+                }
+                geometry.attributes.position.needsUpdate = true;
+            },
+            heart: () => {
+                const pos = geometry.attributes.position.array;
+                for (let i = 0; i < particleCount; i++) {
+                    const t = Math.random() * Math.PI * 2;
+                    pos[i * 3] = 0.15 * (16 * Math.sin(t) ** 3);
+                    pos[i * 3 + 1] = 0.15 * (13 * Math.cos(t) - 5 * Math.cos(2 * t) - 2 * Math.cos(3 * t) - Math.cos(4 * t));
+                    pos[i * 3 + 2] = (Math.random() - 0.5) * 2;
+                }
+                geometry.attributes.position.needsUpdate = true;
+            }
+        };
 
         // --- MEDIAPIPE HANDS SETUP ---
         const videoElement = document.getElementsByClassName('video-feed')[0];
@@ -95,79 +97,41 @@
         hands.setOptions({
             maxNumHands: 1,
             modelComplexity: 1,
-            minDetectionConfidence: 0.7,
-            minTrackingConfidence: 0.7
+            minDetectionConfidence: 0.5,
+            minTrackingConfidence: 0.5
         });
-
-        const gestureStatus = document.getElementById('gestureStatus');
 
         hands.onResults((results) => {
             if (results.multiHandLandmarks && results.multiHandLandmarks.length > 0) {
                 const landmarks = results.multiHandLandmarks[0];
                 
-                // Track Palm for Base Position & Rotation
-                const palm = landmarks[0]; // Wrist
-                particleSystem.rotation.y = THREE.MathUtils.lerp(particleSystem.rotation.y, (palm.x - 0.5) * Math.PI, 0.1);
-                particleSystem.rotation.x = THREE.MathUtils.lerp(particleSystem.rotation.x, (palm.y - 0.5) * Math.PI, 0.1);
-
-                // Gesture: Hand Open (Repulsor Beam) vs Fist (Arc Reactor)
+                // Track Index Finger for Rotation
                 const indexTip = landmarks[8];
+                particleSystem.rotation.y = indexTip.x * Math.PI * 2;
+                particleSystem.rotation.x = indexTip.y * Math.PI;
+
+                // Simple Gesture: Distance between Thumb and Index for Scale
                 const thumbTip = landmarks[4];
                 const distance = Math.sqrt(
                     Math.pow(indexTip.x - thumbTip.x, 2) + 
                     Math.pow(indexTip.y - thumbTip.y, 2)
                 );
 
-                const posAttribute = geometry.attributes.position;
-                const colorAttribute = geometry.attributes.color;
+                const targetScale = distance * 5 + 0.5;
+                particleSystem.scale.setScalar(THREE.MathUtils.lerp(particleSystem.scale.x, targetScale, 0.1));
 
-                if (distance > 0.15) {
-                    // --- GESTURE: OPEN HAND (Repulsor Beam) ---
-                    gestureStatus.innerText = "REPULSOR ACTIVE";
-                    gestureStatus.style.color = "#ff4444"; // Red alert
-                    
-                    for (let i = 0; i < particleCount; i++) {
-                        // Move particles outward along Z axis (beam effect)
-                        posAttribute.array[i * 3 + 2] += Math.random() * 0.2;
-                        
-                        // Fade to white hot beam
-                        colorAttribute.array[i * 3] = THREE.MathUtils.lerp(colorAttribute.array[i * 3], beamColor.r, 0.05);
-                        colorAttribute.array[i * 3 + 1] = THREE.MathUtils.lerp(colorAttribute.array[i * 3 + 1], beamColor.g, 0.05);
-                        colorAttribute.array[i * 3 + 2] = THREE.MathUtils.lerp(colorAttribute.array[i * 3 + 2], beamColor.b, 0.05);
-
-                        // Reset distant particles
-                        if (posAttribute.array[i * 3 + 2] > 10) {
-                            posAttribute.array[i * 3 + 2] = (Math.random() - 0.5) * 0.5;
-                        }
-                    }
+                // Switch Shape on high index finger
+                if (indexTip.y < 0.2) {
+                    shapes.heart();
+                    document.getElementById('currentShape').innerText = "Heart";
                 } else {
-                    // --- GESTURE: FIST (Arc Reactor Core) ---
-                    gestureStatus.innerText = "CORE STABLE";
-                    gestureStatus.style.color = "#00ff00"; // Green stable
-                    
-                    for (let i = 0; i < particleCount; i++) {
-                        // Reset to ring formation
-                        const angle = (i / particleCount) * Math.PI * 2;
-                        const radius = 1.5 + (Math.random() - 0.5) * 0.1;
-                        posAttribute.array[i * 3] = THREE.MathUtils.lerp(posAttribute.array[i * 3], Math.cos(angle) * radius, 0.1);
-                        posAttribute.array[i * 3 + 1] = THREE.MathUtils.lerp(posAttribute.array[i * 3 + 1], Math.sin(angle) * radius, 0.1);
-                        posAttribute.array[i * 3 + 2] = THREE.MathUtils.lerp(posAttribute.array[i * 3 + 2], (Math.random() - 0.5) * 0.2, 0.1);
-
-                        // Fade back to core blue
-                        colorAttribute.array[i * 3] = THREE.MathUtils.lerp(colorAttribute.array[i * 3], coreColor.r, 0.05);
-                        colorAttribute.array[i * 3 + 1] = THREE.MathUtils.lerp(colorAttribute.array[i * 3 + 1], coreColor.g, 0.05);
-                        colorAttribute.array[i * 3 + 2] = THREE.MathUtils.lerp(colorAttribute.array[i * 3 + 2], coreColor.b, 0.05);
-                    }
+                    shapes.sphere();
+                    document.getElementById('currentShape').innerText = "Sphere";
                 }
-                posAttribute.needsUpdate = true;
-                colorAttribute.needsUpdate = true;
-            } else {
-                gestureStatus.innerText = "NO HAND DETECTED";
-                gestureStatus.style.color = "#ffcc00"; // Warning
             }
         });
 
-                const cameraFeed = new Camera(videoElement, {
+        const cameraFeed = new Camera(videoElement, {
             onFrame: async () => {
                 await hands.send({ image: videoElement });
             },
@@ -179,8 +143,7 @@
         // --- ANIMATION LOOP ---
         function animate() {
             requestAnimationFrame(animate);
-            // Constant core pulse
-            particleSystem.scale.setScalar(1 + Math.sin(Date.now() * 0.005) * 0.02);
+            particleSystem.rotation.z += 0.002;
             renderer.render(scene, camera);
         }
 
@@ -191,6 +154,7 @@
         });
 
         animate();
+        shapes.sphere(); // Default
     </script>
 </body>
 </html>
